@@ -128,3 +128,18 @@ def get_ip(iface='eth0'):
         0x8915, # SIOCGIFADDR
         struct.pack('256s', iface[:15])
     )[20:24])
+
+def get_class(class_path):
+    module_path, class_name = class_path.rsplit(".", 1)
+
+    try:
+        module = __import__(module_path, fromlist=[class_name])
+    except ImportError:
+        raise ValueError("Module '%s' could not be imported" % (module_path,))
+
+    try:
+        cls = getattr(module, class_name)
+    except AttributeError:
+        raise ValueError("Module '%s' has no class '%s'" % (module_path, class_name,))
+
+    return cls

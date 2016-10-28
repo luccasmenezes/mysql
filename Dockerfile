@@ -23,6 +23,7 @@ RUN set -ex \
        python-Consul==0.4.7 \
        manta==2.5.0 \
        mock==2.0.0 \
+       boto==2.43.0 \
     # \
     # Add Consul from https://releases.hashicorp.com/consul \
     # \
@@ -67,5 +68,6 @@ CMD [ "containerpilot", \
       "--log-bin=mysql-bin", \
       "--log_slave_updates=ON", \
       "--gtid-mode=ON", \
-      "--enforce-gtid-consistency=ON" \
+      "--enforce-gtid-consistency=ON", \
+      "--skip-performance-schema" \
 ]

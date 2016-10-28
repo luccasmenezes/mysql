@@ -9,10 +9,9 @@ import sys
 # pylint: disable=invalid-name,no-self-use,dangerous-default-value
 from manager.containerpilot import ContainerPilot
 from manager.libconsul import Consul
-from manager.libmanta import Manta
 from manager.libmysql import MySQL, MySQLError
 from manager.utils import \
-    log, get_ip, debug, \
+    log, get_ip, debug, env, get_class, \
     UnknownPrimary, WaitTimeoutError, \
     PRIMARY, REPLICA, UNASSIGNED, \
     PRIMARY_KEY, BACKUP_NAME
@@ -23,10 +22,10 @@ class Node(object):
     Node represents the state of our running container and carries
     around the MySQL config, and clients for Consul and Manta.
     """
-    def __init__(self, mysql=None, cp=None, consul=None, manta=None):
+    def __init__(self, mysql=None, cp=None, consul=None, backup_store=None):
         self.mysql = mysql
         self.consul = consul
-        self.manta = manta
+        self.backup_store = backup_store
         self.cp = cp
 
         self.hostname = socket.gethostname()
@@ -104,7 +103,7 @@ def pre_start(node):
     if not os.path.isdir(os.path.join(my.datadir, 'mysql')):
         last_backup = node.consul.has_snapshot()
         if last_backup:
-            node.manta.get_backup(last_backup)
+            node.backup_store.get_backup(last_backup)
             my.restore_from_snapshot(last_backup)
         else:
             if not my.initialize_db():
@@ -250,17 +249,19 @@ def write_snapshot(node):
     backup_id = now.strftime('{}'.format(BACKUP_NAME))
     backup_time = now.isoformat()
 
-    with open('/tmp/backup.tar', 'w') as f:
-        subprocess.check_call(['/usr/bin/innobackupex',
+    with open('/tmp/backup.tar.gz', 'w') as f:
+        backup_proc = subprocess.Popen(['/usr/bin/innobackupex',
                                '--user={}'.format(node.mysql.repl_user),
                                '--password={}'.format(node.mysql.repl_password),
                                '--no-timestamp',
-                               #'--compress',
+                               # '--compress',
                                '--stream=tar',
-                               '/tmp/backup'], stdout=f)
+                               '/tmp/backup'], stdout=subprocess.PIPE)
+        gzip_proc = subprocess.Popen(['gzip', '-c'], stdin=backup_proc.stdout, stdout=f)
+        gzip_proc.communicate()
     log.info('snapshot completed, uploading to object store')
-    node.manta.put_backup(backup_id, '/tmp/backup.tar')
-    log.info('snapshot uploaded to %s/%s', node.manta.bucket, backup_id)
+    node.backup_store.put_backup(backup_id, '/tmp/backup.tar.gz')
+    log.info('snapshot uploaded to %s/%s', node.backup_store.bucket, backup_id)
 
     # write the filename of the binlog to Consul so that we know if
     # we've rotated since the last backup.
@@ -388,11 +389,13 @@ def main():
             log.error('Invalid command: %s', sys.argv[1])
             sys.exit(1)
 
+    storage_class = env('BACKUP_STORAGE_CLASS', 'manager.libmanta.Manta')
+
     my = MySQL()
-    manta = Manta()
+    backup_store = get_class(storage_class)()
     cp = ContainerPilot()
     cp.load()
-    node = Node(mysql=my, consul=consul, manta=manta, cp=cp)
+    node = Node(mysql=my, consul=consul, backup_store=backup_store, cp=cp)
 
     cmd(node)
 

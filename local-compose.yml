@@ -2,7 +2,7 @@ mysql:
     extends:
       file: docker-compose.yml
       service: mysql
-    mem_limit: 512m
+    mem_limit: 2g
     environment:
       - CONSUL_AGENT=1
       - CONSUL=consul

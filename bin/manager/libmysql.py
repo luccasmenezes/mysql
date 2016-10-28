@@ -292,7 +292,7 @@ class MySQL(object):
         """
         self.make_datadir()
         infile = '/tmp/backup/{}'.format(filename)
-        subprocess.check_call(['tar', '-xif', infile, '-C', '/tmp/backup'])
+        subprocess.check_call(['tar', '-zxif', infile, '-C', '/tmp/backup'])
         subprocess.check_call(['/usr/bin/innobackupex',
                                '--force-non-empty-directories',
                                '--copy-back',

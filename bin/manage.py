@@ -336,8 +336,13 @@ def run_as_primary(node):
     if not node.consul.mark_as_primary(node.name):
         return False
     node.cp.state = PRIMARY
-
-    conn = node.mysql.wait_for_connection()
+    conn = False
+    try:
+        conn = node.mysql.wait_for_connection()
+    except WaitTimeoutError:
+        pass
+    except:
+        raise
     my = node.mysql
     if conn:
         # if we can make a connection w/o a password then this is the

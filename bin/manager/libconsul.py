@@ -245,7 +245,7 @@ class Consul(object):
         """
         lock_filename = '/tmp/' + BACKUP_LOCK_KEY
         try:
-            with open(BACKUP_LOCK_KEY, 'r+') as f:
+            with open(lock_filename, 'r+') as f:
                 session_id = f.read()
                 self.unlock(BACKUP_LOCK_KEY, session_id)
                 fcntl.flock(f, fcntl.LOCK_UN)
